@@ -1,0 +1,9 @@
+﻿  Main.c
+Main.c(145): warning C4477: 'printf' : format string '%6d' requires an argument of type 'int', but variadic argument 1 has type '::size_t'
+  Main.c(145): note: consider using '%zd' in the format string
+Main.c(216): warning C4305: 'initializing': truncation from 'double' to 'float'
+Main.c(215): warning C4101: 'objet': unreferenced local variable
+Main.c(672): warning C4477: 'printf' : format string '%d' requires an argument of type 'int', but variadic argument 1 has type '::size_t'
+  Main.c(672): note: consider using '%zd' in the format string
+Main.c(770): warning C4267: '+=': conversion from 'size_t' to 'unsigned int', possible loss of data
+  LeddarCDemo.vcxproj -> C:\Users\Administrator\Desktop\LeddarTech\x64\Debug\LeddarCDemo.exe
