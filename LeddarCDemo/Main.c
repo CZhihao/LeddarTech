@@ -202,6 +202,29 @@ DataCallbackLive(void *aHandle, unsigned int aLevels)
 
 	return 1;
 }
+//calibration each FrenquencyCalibration times
+static void distanceCalibration(double distance[16],int numInCamera,float average[16], float sigma[16])
+{	
+	
+	float total[16];
+	float allDistance[16][100];
+	int i=0; int j=0;
+	while((numInCamera==0)&&(i<100))
+	{
+		for(j=0;j<16;j++)
+		total[j]+=distance[j];
+		allDistance[j][i]=distance[j];
+	}
+	for(j=0;j<16;j++)
+	{
+		average[j]=total[j]/16;
+	}
+	
+	sigma[j]=
+
+	
+		
+
 
 
 //calculation of the speed for the mode replay
@@ -322,13 +345,14 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 
 
 
-//calculation of the meam distance
+//calculation of the mean distance
 
 static float Mean()
 {
 	float AllDetection[1600];
 	float mean[16];
 	float total = 0;
+	float oneMean=0;
 
 	int i, j = 0;
 	for (i = 0; i < 100; i++)
@@ -356,11 +380,12 @@ static float Mean()
 
 	for (i = 0; i < 16; i++)
 	{
-		printf("%5.2f ",mean[i]);
+		oneMean+=mean[i];
+		//printf("%5.2f ",mean[i]);
 	}
 
-	return AllDetection[1600];
 	
+	return oneMean
 }
 
 // *****************************************************************************
@@ -400,7 +425,7 @@ ReadLiveData( void )
 static void
 ReplayData( void )
 {
-    puts( "\nP to go forward, O to go backward, H to return to beginning, Q to quit£¬ M to mean value" );
+    puts( "\nP to go forward, O to go backward, H to return to beginning, Q to quitÂ£Â¬ M to mean value" );
 
     CheckError( LeddarStartDataTransfer( gHandle, LDDL_DETECTIONS ) );
     CheckError( LeddarAddCallback( gHandle, DataCallback, gHandle ) );
