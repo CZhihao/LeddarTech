@@ -202,7 +202,8 @@ DataCallbackLive(void *aHandle, unsigned int aLevels)
 
 	return 1;
 }
-//calibration each FrenquencyCalibration times
+
+//Calibration every FrenquencyCalibration times. This function should be called in the fonction Tracking
 static void distanceCalibration(double distance[16],int numInCamera,float average[16], float sigma[16])
 {	
 	
@@ -212,15 +213,21 @@ static void distanceCalibration(double distance[16],int numInCamera,float averag
 	while((numInCamera==0)&&(i<100))
 	{
 		for(j=0;j<16;j++)
+		{
 		total[j]+=distance[j];
+		sigma[j]=0.0;
 		allDistance[j][i]=distance[j];
+		}
+		i++;
 	}
 	for(j=0;j<16;j++)
 	{
 		average[j]=total[j]/16;
+		for (i=)
+		sigma[j]+=((average[j]-allDistance[j][i])*(average[j]-allDistance[j][i]))
 	}
 	
-	sigma[j]=
+	
 
 	
 		
@@ -267,7 +274,6 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 			else
 				thisDetection[i].mDistance = lDetections[2*i+1].mDistance;
 		}
-		printf("%5.2f, %5.2f\n", lDetections[31].mDistance, thisDetection[15].mDistance);
 
 		//if a new objet enters in the camera, register it in the trackinglist
 		if ((lastDetection[15].mDistance >=11.0) && (thisDetection[15].mDistance < 11.0))
