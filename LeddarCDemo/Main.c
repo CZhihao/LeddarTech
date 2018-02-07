@@ -223,9 +223,14 @@ static void distanceCalibration(double distance[16],int numInCamera,float averag
 	for(j=0;j<16;j++)
 	{
 		average[j]=total[j]/16;
-		for (i=)
-		sigma[j]+=((average[j]-allDistance[j][i])*(average[j]-allDistance[j][i]))
+		for (i=0;i<100;i++)
+		{
+		sigma[j]+=((average[j]-allDistance[j][i])*(average[j]-allDistance[j][i]));
+		}
+		sigma[j]=sigma[j]/100;
+
 	}
+}
 	
 	
 
@@ -243,6 +248,8 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	LdDetection thisDetection[50];
 	LdDetection lastDetection[50];
 	int objet[16];
+	float average[16];
+	float sigma[16];
 	float lengthView = 5.1;//length of the sensor's view range, calculated by the process calibration
 
 	//initiale the first frame
@@ -274,7 +281,11 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 			else
 				thisDetection[i].mDistance = lDetections[2*i+1].mDistance;
 		}
-
+		
+		//calibration : get the variance and the average of the road to determinate the confidence interval
+		distanceCalibration( *thisDetection.mDistance,numInCamera,average[16],sigma[16]);
+		printf("%5.2f  %5.2f",average[5],sigma[5]);
+		/*
 		//if a new objet enters in the camera, register it in the trackinglist
 		if ((lastDetection[15].mDistance >=11.0) && (thisDetection[15].mDistance < 11.0))
 		{
@@ -338,7 +349,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 
 			}
 		printf("%d, %d,,%f,%f %f,%f\n", aTrackinglist[0].id, aTrackinglist[0].position, aTrackinglist[0].timeIn, aTrackinglist[0].timeOut, aTrackinglist[0].speedAverage, aTrackinglist[0].length);
-		
+		*/
 		
 		//LeddarSleep(0.002);
 
