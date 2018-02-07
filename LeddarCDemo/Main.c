@@ -36,18 +36,14 @@
 #define Frenquency 200
 
 // Global variable to avoid passing to each function.
-static LeddarHandle gHandle=NULL;
+static LeddarHandle gHandle = NULL;
 LdDetection lDetections[50];
 float lastDetections[50];
-int isInitialized=0;
+int isInitialized = 0;
 int SizeTrackinglist;
 
 typedef struct Trackinglist
 {
-	/*float     mDistance;
-	float     mAmplitude;
-	LeddarU16 mSegment;
-	LeddarU16 mFlags;*/
 	int id;
 	int inCamera;//=1 if this object is in the camera, otherwise =0
 	float timeIn;
@@ -69,15 +65,15 @@ Trackinglist list[1000];
 // *****************************************************************************
 
 static void
-CheckError( int aCode )
+CheckError(int aCode)
 {
-    if ( aCode != LD_SUCCESS )
-    {
-        LtChar lMessage[200];
+	if (aCode != LD_SUCCESS)
+	{
+		LtChar lMessage[200];
 
-        LeddarGetErrorMessage( aCode, lMessage, ARRAY_LEN( lMessage ) );
-        LeddarPrintf( LTS( "LeddarC error (%d): %s\n" ), aCode, lMessage );
-    }
+		LeddarGetErrorMessage(aCode, lMessage, ARRAY_LEN(lMessage));
+		LeddarPrintf(LTS("LeddarC error (%d): %s\n"), aCode, lMessage);
+	}
 }
 
 // *****************************************************************************
@@ -91,25 +87,25 @@ CheckError( int aCode )
 // *****************************************************************************
 
 static char
-WaitKey( void )
+WaitKey(void)
 {
-    // LeddarGetKey is blocking so we need to wait for a key to be pressed
-    // before calling it.
-    while( !LeddarKeyPressed() )
-    {
-        // If a live connection is active we need to ping it periodically.
-        if ( LeddarGetConnected( gHandle ) )
-        {
-            if ( LeddarPing( gHandle ) != LD_SUCCESS )
-            {
-                return 0;
-            }
-        }
+	// LeddarGetKey is blocking so we need to wait for a key to be pressed
+	// before calling it.
+	while (!LeddarKeyPressed())
+	{
+		// If a live connection is active we need to ping it periodically.
+		if (LeddarGetConnected(gHandle))
+		{
+			if (LeddarPing(gHandle) != LD_SUCCESS)
+			{
+				return 0;
+			}
+		}
 
-        LeddarSleep( 0.5 );
-    }
+		LeddarSleep(0.5);
+	}
 
-    return toupper( LeddarGetKey() );
+	return toupper(LeddarGetKey());
 }
 
 // *****************************************************************************
@@ -127,28 +123,28 @@ WaitKey( void )
 // *****************************************************************************
 
 static unsigned char
-DataCallback( void *aHandle, unsigned int aLevels )
+DataCallback(void *aHandle, unsigned int aLevels)
 {
-    unsigned int i, j, lCount = LeddarGetDetectionCount( aHandle );
+	unsigned int i, j, lCount = LeddarGetDetectionCount(aHandle);
 
 
-    if ( lCount > ARRAY_LEN( lDetections ) )
-    {
-        lCount = ARRAY_LEN( lDetections );
-    }
-
-    LeddarGetDetections( aHandle, lDetections, ARRAY_LEN( lDetections ) );
-
-    // When replaying a record, display the current index
-    if ( LeddarGetRecordSize( gHandle ) != 0 )
-    {
-        printf( "%6d ", LeddarGetCurrentRecordIndex( gHandle ) );
-    }
-
-    for( i=0, j=0; (i<lCount) && (j<16); ++i )
+	if (lCount > ARRAY_LEN(lDetections))
 	{
-	printf("%5.2f ", lDetections[2*i+1].mDistance);
-	++j;
+		lCount = ARRAY_LEN(lDetections);
+	}
+
+	LeddarGetDetections(aHandle, lDetections, ARRAY_LEN(lDetections));
+
+	// When replaying a record, display the current index
+	if (LeddarGetRecordSize(gHandle) != 0)
+	{
+		printf("%6d ", LeddarGetCurrentRecordIndex(gHandle));
+	}
+
+	for (i = 0, j = 0; (i<lCount) && (j<16); ++i)
+	{
+		printf("%5.2f ", lDetections[2 * i + 1].mDistance);
+		++j;
 	}
 	puts("");
 
@@ -204,38 +200,19 @@ DataCallbackLive(void *aHandle, unsigned int aLevels)
 }
 
 //Calibration every FrenquencyCalibration times. This function should be called in the fonction Tracking
-static void distanceCalibration(double distance[16],int numInCamera,float average[16], float sigma[16])
-{	
-	
+static void distanceCalibration(float distance[16], int numInCamera, float average[16], float sigma[16])
+{
+
 	float total[16];
 	float allDistance[16][100];
-	int i=0; int j=0;
-	while((numInCamera==0)&&(i<100))
-	{
-		for(j=0;j<16;j++)
-		{
-		total[j]+=distance[j];
-		sigma[j]=0.0;
-		allDistance[j][i]=distance[j];
-		}
-		i++;
-	}
-	for(j=0;j<16;j++)
-	{
-		average[j]=total[j]/16;
-		for (i=0;i<100;i++)
-		{
-		sigma[j]+=((average[j]-allDistance[j][i])*(average[j]-allDistance[j][i]));
-		}
-		sigma[j]=sigma[j]/100;
+	int i = 0; int j = 0;
 
-	}
 }
-	
-	
 
-	
-		
+
+
+
+
 
 
 
@@ -243,21 +220,37 @@ static void distanceCalibration(double distance[16],int numInCamera,float averag
 static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTrackinglist)
 {
 	int frame = 0;
-	int i;
+	int i,j;
 	int numbInCamera = 0;//number of the objets in the camera
+	int numFrameCalibration=0;//number of frames taken for the present calibration
+	float allDistance[16][100];
+	float total[16];
+	float sigma[16];
+	for (i = 0; i < 16; i++)
+	{
+		total[i] = 0;
+	}
 	LdDetection thisDetection[50];
 	LdDetection lastDetection[50];
 	int objet[16];
 	float average[16];
-	float sigma[16];
+
 	float lengthView = 5.1;//length of the sensor's view range, calculated by the process calibration
 
-	//initiale the first frame
+						   //initialize the first frame
 	LeddarMoveRecordTo(aHandle, frame);
-	frame=frame+1;
+	frame = frame + 1;
 	for (i = 0; i < 16; i++)
 	{
-		thisDetection[i].mDistance = lDetections[2*i+1].mDistance;
+		thisDetection[i].mDistance = lDetections[2 * i + 1].mDistance;
+	}
+
+	//initialize the default confiance interval
+	for (i = 0; i < 16; i++)
+	{
+		//printf("Enter the default variance for segment %d", i);
+		//scanf("%f", &sigma[i]);
+		sigma[i] = 0.05;
 	}
 
 
@@ -268,93 +261,116 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	{
 		//initialize the first frame
 		LeddarMoveRecordTo(aHandle, frame);
-		frame=frame+1;
+		frame = frame + 1;
 
 		//prepare the useful raw infomation: save the last distances and the current distances for every segement 
-		for (i = 0; i < 16; i++ )
+		for (i = 0; i < 16; i++)
 		{
-			
+
 			lastDetection[i].mDistance = thisDetection[i].mDistance;
 			//if the distance mesure error occurs, use the last correct distance instead of wrong distance 
 			if ((lDetections[2 * i + 1].mDistance > 20) || (lDetections[2 * i + 1].mDistance < 5))
+
+			{
 				thisDetection[i].mDistance = lastDetection[i].mDistance;
+			}
 			else
-				thisDetection[i].mDistance = lDetections[2*i+1].mDistance;
+			{
+				thisDetection[i].mDistance = lDetections[2 * i + 1].mDistance;
+			}
+		}
+
+		//Calibration: get the variance and the average of the road to determinate the confidence interval
+		//Calibration should be made periodically
+		//Two steps to realize a calibration: firstly prepare the measure of 100 frames, secondly calculate the confidence interval with the measures prepared 
+
+		//Step one: get 100 frames measures for calibration
+		if ((numbInCamera == 0) && (numFrameCalibration<100))
+		{
+			for (j = 0; j<16; j++)
+			{
+				total[j] += thisDetection[j].mDistance;
+				allDistance[j][numFrameCalibration] = thisDetection[j].mDistance;
+			}
+			numFrameCalibration++;
+		}
+
+		//Step 2: if all the measures for the calibration are prepared
+		if (numFrameCalibration == 100)
+		{
+			for (j = 0; j<16; j++)
+			{
+				average[j] = total[j] / 100;
+				total[j] = 0;
+				sigma[j] = 0;
+				for (i = 0; i<100; i++)
+				{
+					sigma[j] += ((average[j] - allDistance[j][i])*(average[j] - allDistance[j][i]));
+				}
+				sigma[j] = sigma[j] / 100;
+
+			}		printf("average is %5.2f, sigma is %5.2f  \n", average[5], sigma[5]);
+			numFrameCalibration = 0;
+
 		}
 		
-		//calibration : get the variance and the average of the road to determinate the confidence interval
-		distanceCalibration( *thisDetection.mDistance,numInCamera,average[16],sigma[16]);
-		printf("%5.2f  %5.2f",average[5],sigma[5]);
-		/*
+		
 		//if a new objet enters in the camera, register it in the trackinglist
 		if ((lastDetection[15].mDistance >=11.0) && (thisDetection[15].mDistance < 11.0))
 		{
+		aTrackinglist[*aSizeTrackinglist].id = *aSizeTrackinglist;//give this object an unique ID
+		aTrackinglist[*aSizeTrackinglist].position = 16;
+		aTrackinglist[*aSizeTrackinglist].inCamera = 1;
+		aTrackinglist[*aSizeTrackinglist].timeIn =(float) frame;
 
-			aTrackinglist[*aSizeTrackinglist].id = *aSizeTrackinglist;//give this object an unique ID
-			aTrackinglist[*aSizeTrackinglist].position = 16;
-			aTrackinglist[*aSizeTrackinglist].inCamera = 1;
-			aTrackinglist[*aSizeTrackinglist].timeIn =(float) frame;
-			
-
-			*aSizeTrackinglist=*aSizeTrackinglist+1;
-			numbInCamera=numbInCamera+1;
-			printf("An object is entering at the time %d\n",frame);
+		*aSizeTrackinglist=*aSizeTrackinglist+1;
+		numbInCamera=numbInCamera+1;
+		printf("An object is entering at the time %d\n",frame);
 		}
 
-	
 		//if an object is leaving
 		if ((lastDetection[0].mDistance >= 11.0) && (thisDetection[0].mDistance < 11.0))
 		{
 
-			
-			aTrackinglist[*aSizeTrackinglist- numbInCamera].position = 0;
-			aTrackinglist[*aSizeTrackinglist - numbInCamera].inCamera = 0;//not more in the camera 
-			aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut =(float)frame;//note down the leave time(frame)
-			//calculate its average speed: speed=lengthOfView/(timeOut-timeIn)
-			aTrackinglist[*aSizeTrackinglist - numbInCamera].speedAverage= (lengthView/(aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut- aTrackinglist[*aSizeTrackinglist - numbInCamera].timeIn)*(Frenquency));
-
-			numbInCamera--;
-			printf("An object is leaving at the time %d\n",frame);
+		aTrackinglist[*aSizeTrackinglist- numbInCamera].position = 0;
+		aTrackinglist[*aSizeTrackinglist - numbInCamera].inCamera = 0;//not more in the camera
+		aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut =(float)frame;//note down the leave time(frame)
+		//calculate its average speed: speed=lengthOfView/(timeOut-timeIn)
+		aTrackinglist[*aSizeTrackinglist - numbInCamera].speedAverage= (lengthView/(aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut- aTrackinglist[*aSizeTrackinglist - numbInCamera].timeIn)*(Frenquency));
+		numbInCamera--;
+		printf("An object is leaving at the time %d\n",frame);
 		}
-
 		//Calculate the length of the newest entered object: note down the moment when its rear leaves the last segment
 		//length=(rearleavetime-headarrivetime)*speed
 		if ((lastDetection[15].mDistance <= 11.0) && (thisDetection[15].mDistance > 11.0))
 		{
-			
-			if (numbInCamera == 0)//if this is a long object whose head has already left the camera view, its average speed has been calculated
-				aTrackinglist[*aSizeTrackinglist - 1].length = aTrackinglist[*aSizeTrackinglist - 1].speedAverage*((frame - aTrackinglist[*aSizeTrackinglist - 1].timeIn) / Frenquency);
-			else
-			{
-				aTrackinglist[*aSizeTrackinglist - numbInCamera].length = (16 - aTrackinglist[*aSizeTrackinglist - numbInCamera].position)*lengthView / 16;
-			}
 
+		if (numbInCamera == 0)//if this is a long object whose head has already left the camera view, its average speed has been calculated
+		aTrackinglist[*aSizeTrackinglist - 1].length = aTrackinglist[*aSizeTrackinglist - 1].speedAverage*((frame - aTrackinglist[*aSizeTrackinglist - 1].timeIn) / Frenquency);
+		else
+		{
+		aTrackinglist[*aSizeTrackinglist - numbInCamera].length = (16 - aTrackinglist[*aSizeTrackinglist - numbInCamera].position)*lengthView / 16;
 		}
-
-
+		}
 		//update the tracking object's position
 		if(numbInCamera > 0)
-			{	
+		{
+		for (i = (*aSizeTrackinglist - 1); i >= (*aSizeTrackinglist - numbInCamera) ;i--)
+		{
+		if (thisDetection[aTrackinglist[i].position - 2].mDistance < 11.0 )
+		{
+		aTrackinglist[i].position = aTrackinglist[i].position - 1;
+		}
 
-
-			for (i = (*aSizeTrackinglist - 1); i >= (*aSizeTrackinglist - numbInCamera) ;i--)
-			{
-				if (thisDetection[aTrackinglist[i].position - 2].mDistance < 11.0 )
-				{
-					aTrackinglist[i].position = aTrackinglist[i].position - 1;
-
-				}
-				
-			}
-
-			}
+		}
+		}
 		printf("%d, %d,,%f,%f %f,%f\n", aTrackinglist[0].id, aTrackinglist[0].position, aTrackinglist[0].timeIn, aTrackinglist[0].timeOut, aTrackinglist[0].speedAverage, aTrackinglist[0].length);
-		*/
 		
+
 		//LeddarSleep(0.002);
 
 	}
-	
+
 
 }
 
@@ -369,7 +385,7 @@ static float Mean()
 	float AllDetection[1600];
 	float mean[16];
 	float total = 0;
-	float oneMean=0;
+	float oneMean = 0;
 
 	int i, j = 0;
 	for (i = 0; i < 100; i++)
@@ -377,15 +393,15 @@ static float Mean()
 		LeddarMoveRecordTo(gHandle, i);
 		for (j = 0; j < 16; j++)
 		{
-		
 
-			AllDetection[16 * i + j] = lDetections[j*2+1].mDistance;
+
+			AllDetection[16 * i + j] = lDetections[j * 2 + 1].mDistance;
 			printf("%5.2f\n", lDetections[j * 2 + 1].mDistance);
 		}
-		
+
 	}
 
-	for (j = 0; j < 16; j++  )
+	for (j = 0; j < 16; j++)
 	{
 		total = 0;
 		for (i = 0; i < 100; i++)
@@ -397,12 +413,12 @@ static float Mean()
 
 	for (i = 0; i < 16; i++)
 	{
-		oneMean+=mean[i];
+		oneMean += mean[i];
 		//printf("%5.2f ",mean[i]);
 	}
 
-	
-	return oneMean
+
+	return oneMean;
 }
 
 // *****************************************************************************
@@ -413,23 +429,23 @@ static float Mean()
 // *****************************************************************************
 
 static void
-ReadLiveData( void )
+ReadLiveData(void)
 {
 	int i = 0;
-    puts( "\nPress a key to start reading data and press a key again to stop." );
-    WaitKey();
+	puts("\nPress a key to start reading data and press a key again to stop.");
+	WaitKey();
 
-    CheckError( LeddarStartDataTransfer( gHandle, LDDL_DETECTIONS ) );
-    CheckError( LeddarAddCallback( gHandle, DataCallback, gHandle ) );
+	CheckError(LeddarStartDataTransfer(gHandle, LDDL_DETECTIONS));
+	CheckError(LeddarAddCallback(gHandle, DataCallback, gHandle));
 	for (i = 0; i < 16; i++)
 	{
 		printf("%5.2f ", lDetections[i].mDistance);
 	}
 
-    WaitKey();
+	WaitKey();
 
-    LeddarStopDataTransfer( gHandle );
-    LeddarRemoveCallback( gHandle, DataCallback, gHandle );
+	LeddarStopDataTransfer(gHandle);
+	LeddarRemoveCallback(gHandle, DataCallback, gHandle);
 }
 
 // *****************************************************************************
@@ -440,41 +456,41 @@ ReadLiveData( void )
 // *****************************************************************************
 
 static void
-ReplayData( void )
+ReplayData(void)
 {
-    puts( "\nP to go forward, O to go backward, H to return to beginning, Q to quit£¬ M to mean value" );
+	puts("\nP to go forward, O to go backward, H to return to beginning, Q to quit£¬ M to mean value");
 
-    CheckError( LeddarStartDataTransfer( gHandle, LDDL_DETECTIONS ) );
-    CheckError( LeddarAddCallback( gHandle, DataCallback, gHandle ) );
+	CheckError(LeddarStartDataTransfer(gHandle, LDDL_DETECTIONS));
+	CheckError(LeddarAddCallback(gHandle, DataCallback, gHandle));
 
-    for(;;)
-    {
-        char lChoice = WaitKey();
+	for (;;)
+	{
+		char lChoice = WaitKey();
 
-        switch( lChoice )
-        {
-            case 'H':
-                LeddarMoveRecordTo( gHandle, 0 );
-                break;
-            case 'O':
-                CheckError( LeddarStepBackward( gHandle ) );
-                break;
-            case 'P':
-				CheckError(LeddarStepForward(gHandle) );
-                break;
-			case 'M':
-				Mean();
-				break;
-			case'T':
-					SpeedRepaly(gHandle,list,&SizeTrackinglist);
-				break;
-            case 'Q':
-            case  27: // Escape
-                LeddarStopDataTransfer( gHandle );
-                LeddarRemoveCallback( gHandle, DataCallback, gHandle );
-                return;
-        }
-    }
+		switch (lChoice)
+		{
+		case 'H':
+			LeddarMoveRecordTo(gHandle, 0);
+			break;
+		case 'O':
+			CheckError(LeddarStepBackward(gHandle));
+			break;
+		case 'P':
+			CheckError(LeddarStepForward(gHandle));
+			break;
+		case 'M':
+			Mean();
+			break;
+		case'T':
+			SpeedRepaly(gHandle, list, &SizeTrackinglist);
+			break;
+		case 'Q':
+		case  27: // Escape
+			LeddarStopDataTransfer(gHandle);
+			LeddarRemoveCallback(gHandle, DataCallback, gHandle);
+			return;
+		}
+	}
 }
 
 // *****************************************************************************
@@ -484,27 +500,27 @@ ReplayData( void )
 // *****************************************************************************
 
 static void
-ReadConfiguration( void )
+ReadConfiguration(void)
 {
-    double lValue;
-    char   lValueStr[64];
+	double lValue;
+	char   lValueStr[64];
 
-    puts( "\nCurrent Configuration:\n" );
-    CheckError( LeddarGetTextProperty( gHandle, PID_NAME, 0, lValueStr, sizeof(lValueStr) ) );
-    printf( "  Device Name     : %s\n", lValueStr );
-    CheckError( LeddarGetProperty( gHandle, PID_OVERSAMPLING, 0, &lValue ) );
-    printf( "  Oversampling    : %.0f\n", lValue );
-    CheckError( LeddarGetProperty( gHandle, PID_ACCUMULATION, 0, &lValue ) );
-    printf( "  Accumulations   : %.0f\n", lValue );
-    CheckError( LeddarGetProperty( gHandle, PID_BASE_POINT_COUNT, 0, &lValue ) );
-    printf( "  Base Point Count: %.0f\n", lValue );
-    CheckError( LeddarGetProperty( gHandle, PID_LED_INTENSITY, 0, &lValue ) );
-    printf( "  Led Intensity   : %.0f\n", lValue );
-    CheckError( LeddarGetProperty( gHandle, PID_THRESHOLD_OFFSET, 0, &lValue ) );
-    printf( "  Threshold offset: %.2f\n", lValue );
-    
-    puts( "\nPress a key to continue." );
-    WaitKey();
+	puts("\nCurrent Configuration:\n");
+	CheckError(LeddarGetTextProperty(gHandle, PID_NAME, 0, lValueStr, sizeof(lValueStr)));
+	printf("  Device Name     : %s\n", lValueStr);
+	CheckError(LeddarGetProperty(gHandle, PID_OVERSAMPLING, 0, &lValue));
+	printf("  Oversampling    : %.0f\n", lValue);
+	CheckError(LeddarGetProperty(gHandle, PID_ACCUMULATION, 0, &lValue));
+	printf("  Accumulations   : %.0f\n", lValue);
+	CheckError(LeddarGetProperty(gHandle, PID_BASE_POINT_COUNT, 0, &lValue));
+	printf("  Base Point Count: %.0f\n", lValue);
+	CheckError(LeddarGetProperty(gHandle, PID_LED_INTENSITY, 0, &lValue));
+	printf("  Led Intensity   : %.0f\n", lValue);
+	CheckError(LeddarGetProperty(gHandle, PID_THRESHOLD_OFFSET, 0, &lValue));
+	printf("  Threshold offset: %.2f\n", lValue);
+
+	puts("\nPress a key to continue.");
+	WaitKey();
 }
 
 // *****************************************************************************
@@ -514,90 +530,90 @@ ReadConfiguration( void )
 // *****************************************************************************
 
 static void
-ConfigurationMenu( void )
+ConfigurationMenu(void)
 {
-    while( LeddarGetConnected( gHandle ) )
-    {
-        char         lChoice;
-        unsigned int lId = 0;
-        unsigned int lType = 1;
+	while (LeddarGetConnected(gHandle))
+	{
+		char         lChoice;
+		unsigned int lId = 0;
+		unsigned int lType = 1;
 
-        puts( "\nConfiguration Change Menu" );
-        puts( "  1. Change Oversampling Exponent" );
-        puts( "  2. Change Accumulation Exponent" );
-        puts( "  3. Change Base Point Count" );
-        puts( "  4. Change Led Intensity" );
-        puts( "  5. Change Threshold Offset" );
-        puts( "  6. Change Name" );
-        puts( "  7. Write" );
-        puts( "  8. Restore" );
-        puts( "  9. Quit" );
+		puts("\nConfiguration Change Menu");
+		puts("  1. Change Oversampling Exponent");
+		puts("  2. Change Accumulation Exponent");
+		puts("  3. Change Base Point Count");
+		puts("  4. Change Led Intensity");
+		puts("  5. Change Threshold Offset");
+		puts("  6. Change Name");
+		puts("  7. Write");
+		puts("  8. Restore");
+		puts("  9. Quit");
 
-        lChoice = WaitKey();
+		lChoice = WaitKey();
 
-        switch( lChoice )
-        {
-            case '1':
-                lId = PID_OVERSAMPLING_EXPONENT;
-                break;
-            case '2':
-                lId = PID_ACCUMULATION_EXPONENT;
-                break;
-            case '3':
-                lId = PID_BASE_POINT_COUNT;
-                break;
-            case '4':
-                lId = PID_LED_INTENSITY;
-                break;
-            case '5':
-                lId = PID_THRESHOLD_OFFSET;
-                break;
-            case '6':
-                lId = PID_NAME;
-                lType = 2;
-                break;
-            case '7':
-                CheckError( LeddarWriteConfiguration( gHandle ) );
-                break;
-            case '8':
-                CheckError( LeddarRestoreConfiguration( gHandle ) );
-                break;
-            case '9':
-            case  27: // Escape
-                if ( !LeddarGetConfigurationModified( gHandle ) )
-                {
-                    return;
-                }
+		switch (lChoice)
+		{
+		case '1':
+			lId = PID_OVERSAMPLING_EXPONENT;
+			break;
+		case '2':
+			lId = PID_ACCUMULATION_EXPONENT;
+			break;
+		case '3':
+			lId = PID_BASE_POINT_COUNT;
+			break;
+		case '4':
+			lId = PID_LED_INTENSITY;
+			break;
+		case '5':
+			lId = PID_THRESHOLD_OFFSET;
+			break;
+		case '6':
+			lId = PID_NAME;
+			lType = 2;
+			break;
+		case '7':
+			CheckError(LeddarWriteConfiguration(gHandle));
+			break;
+		case '8':
+			CheckError(LeddarRestoreConfiguration(gHandle));
+			break;
+		case '9':
+		case  27: // Escape
+			if (!LeddarGetConfigurationModified(gHandle))
+			{
+				return;
+			}
 
-                puts( "\n** Configuration modified, please Write or Restore before quitting **" );
-                break;
-        }
+			puts("\n** Configuration modified, please Write or Restore before quitting **");
+			break;
+		}
 
-        if ( lId != 0 )
-        {
-            printf( "\nEnter new value: " );
+		if (lId != 0)
+		{
+			printf("\nEnter new value: ");
 
-            switch( lType )
-            {
-                case 1:
-                {
-                    double lValue;
+			switch (lType)
+			{
+			case 1:
+			{
+				double lValue;
 
-                    scanf( "%lf", &lValue );
-                    CheckError( LeddarSetProperty( gHandle, lId, 0, lValue ) );
-                }
-                    break;
-                case 2:
-                {
-                    char lValue[64];
+				scanf("%lf", &lValue);
+				CheckError(LeddarSetProperty(gHandle, lId, 0, lValue));
+			}
+			break;
+			case 2:
+			{
+				char lValue[64];
 
-                    scanf( "%63s", lValue );
-                    CheckError( LeddarSetTextProperty( gHandle, lId, 0, lValue ) );
-                }
-                    break;
-            }
-        }
-    }
+				scanf("%63s", lValue);
+				CheckError(LeddarSetTextProperty(gHandle, lId, 0, lValue));
+			}
+			break;
+			}
+		}
+	}
 }
 
 // *****************************************************************************
@@ -612,75 +628,75 @@ ConfigurationMenu( void )
 // *****************************************************************************
 
 static void
-ConnectMenu( int aTrySingleUsb )
+ConnectMenu(int aTrySingleUsb)
 {
-    char lAddress[24];
+	char lAddress[24];
 
-    if ( aTrySingleUsb )
-    {
-        lAddress[0] = 0;
-    }
-    else
-    {
-        // Ask for address and try to connect before displaying menu.
-        printf( "\nEnter address: " );
-        scanf( "%24s", lAddress );
-    }
+	if (aTrySingleUsb)
+	{
+		lAddress[0] = 0;
+	}
+	else
+	{
+		// Ask for address and try to connect before displaying menu.
+		printf("\nEnter address: ");
+		scanf("%24s", lAddress);
+	}
 
-    if ( LeddarConnect( gHandle, lAddress ) == LD_SUCCESS )
-    {
-        while( LeddarGetConnected( gHandle ) )
-        {
-            char lChoice;
+	if (LeddarConnect(gHandle, lAddress) == LD_SUCCESS)
+	{
+		while (LeddarGetConnected(gHandle))
+		{
+			char lChoice;
 
-            puts( "\n\nConnected Menu" );
-            puts( "  1. Read Data" );
-            puts( "  2. Read Configuration" );
-            puts( "  3. Change Configuration" );
-            if ( LeddarGetRecording( gHandle ) )
-            {
-                puts( "  4. Stop Recording" );
-            }
-            else
-            {
-                puts( "  4. Start Recording" );
-            }
-            puts( "  5. Disconnect" );
+			puts("\n\nConnected Menu");
+			puts("  1. Read Data");
+			puts("  2. Read Configuration");
+			puts("  3. Change Configuration");
+			if (LeddarGetRecording(gHandle))
+			{
+				puts("  4. Stop Recording");
+			}
+			else
+			{
+				puts("  4. Start Recording");
+			}
+			puts("  5. Disconnect");
 
-            lChoice = WaitKey();
+			lChoice = WaitKey();
 
-            switch( lChoice )
-            {
-                case '1':
-                    ReadLiveData();
-                    break;
-                case '2':
-                    ReadConfiguration();
-                    break;
-                case '3':
-                    ConfigurationMenu();
-                    break;
-                case '4':
-                    if ( LeddarGetRecording( gHandle ) )
-                    {
-                        LeddarStopRecording( gHandle );
-                    }
-                    else
-                    {
-                        CheckError( LeddarStartRecording( gHandle ) );
-                    }
-                    break;
-                case '5':
-                case  27:
-                    LeddarDisconnect( gHandle );
-                    return;
-            }
-        }
-    }
-    else
-    {
-        puts( "\nConnection failed!" );
-    }    
+			switch (lChoice)
+			{
+			case '1':
+				ReadLiveData();
+				break;
+			case '2':
+				ReadConfiguration();
+				break;
+			case '3':
+				ConfigurationMenu();
+				break;
+			case '4':
+				if (LeddarGetRecording(gHandle))
+				{
+					LeddarStopRecording(gHandle);
+				}
+				else
+				{
+					CheckError(LeddarStartRecording(gHandle));
+				}
+				break;
+			case '5':
+			case  27:
+				LeddarDisconnect(gHandle);
+				return;
+			}
+		}
+	}
+	else
+	{
+		puts("\nConnection failed!");
+	}
 }
 
 // *****************************************************************************
@@ -690,60 +706,60 @@ ConnectMenu( int aTrySingleUsb )
 // *****************************************************************************
 
 static void
-ReplayMenu( void )
+ReplayMenu(void)
 {
-    LtChar lName[256];
+	LtChar lName[256];
 
-    // Ask for file name and try to load record before display menu.
-    printf( "\nEnter file name: " );
-    LeddarScanf( LTS( "%255s" ), lName );
+	// Ask for file name and try to load record before display menu.
+	printf("\nEnter file name: ");
+	LeddarScanf(LTS("%255s"), lName);
 
-    if ( LeddarLoadRecord( gHandle, lName ) == LD_SUCCESS )
-    {
-        puts( "\nPlease wait while the record is loading..." );
+	if (LeddarLoadRecord(gHandle, lName) == LD_SUCCESS)
+	{
+		puts("\nPlease wait while the record is loading...");
 
-        // For a big file, especially if it is on a network drive, it may
-        // take a while before the replay is 100% ready. Note that you
-        // can still use the replay but it will not report the complete
-        // size until it is finished loading.
-        while( LeddarGetRecordLoading( gHandle ) )
-        {
-            LeddarSleep( 0.5 );
-        }
+		// For a big file, especially if it is on a network drive, it may
+		// take a while before the replay is 100% ready. Note that you
+		// can still use the replay but it will not report the complete
+		// size until it is finished loading.
+		while (LeddarGetRecordLoading(gHandle))
+		{
+			LeddarSleep(0.5);
+		}
 
-        printf( "Finished loading record of %d frames.\n", 
-                LeddarGetRecordSize( gHandle ) );
+		printf("Finished loading record of %d frames.\n",
+			LeddarGetRecordSize(gHandle));
 
-        for(;;)
-        {
-            char lChoice;
+		for (;;)
+		{
+			char lChoice;
 
-            puts( "\nReplay Menu" );
-            puts( "  1. Read Data" );
-            puts( "  2. Read Configuration" );
-            puts( "  3. Close" );
+			puts("\nReplay Menu");
+			puts("  1. Read Data");
+			puts("  2. Read Configuration");
+			puts("  3. Close");
 
-            lChoice = WaitKey();
+			lChoice = WaitKey();
 
-            switch( lChoice )
-            {
-                case '1':
-                    ReplayData();
-                    break;
-                case '2':
-                    ReadConfiguration();
-                    break;
-                case '3':
-                case  27:
-                    LeddarDisconnect( gHandle );
-                    return;
-            }
-        }
-    }
-    else
-    {
-        puts( "\nFailed to load file!" );
-    }
+			switch (lChoice)
+			{
+			case '1':
+				ReplayData();
+				break;
+			case '2':
+				ReadConfiguration();
+				break;
+			case '3':
+			case  27:
+				LeddarDisconnect(gHandle);
+				return;
+			}
+		}
+	}
+	else
+	{
+		puts("\nFailed to load file!");
+	}
 }
 
 // *****************************************************************************
@@ -753,38 +769,38 @@ ReplayMenu( void )
 // *****************************************************************************
 
 static void
-ConfigureRecordingMenu( void )
+ConfigureRecordingMenu(void)
 {
-    for(;;)
-    {
-        int    lChoice;
-        LtChar lPath[256];
+	for (;;)
+	{
+		int    lChoice;
+		LtChar lPath[256];
 
-        puts( "\nConfigure Recording Menu" );
-        LeddarGetRecordingDirectory( lPath, ARRAY_LEN(lPath) );
-        LeddarPrintf( LTS( "  1. Change directory (%s)\n" ), lPath );
-        printf( "  2. Change max file size (%dMB)\n", LeddarGetMaxRecordFileSize() );
-        puts( "  3. Quit" );
+		puts("\nConfigure Recording Menu");
+		LeddarGetRecordingDirectory(lPath, ARRAY_LEN(lPath));
+		LeddarPrintf(LTS("  1. Change directory (%s)\n"), lPath);
+		printf("  2. Change max file size (%dMB)\n", LeddarGetMaxRecordFileSize());
+		puts("  3. Quit");
 
-        lChoice = toupper( LeddarGetKey() );
+		lChoice = toupper(LeddarGetKey());
 
-        switch( lChoice )
-        {
-            case '1':
-                printf( "\nEnter recording directory: " );
-                LeddarScanf( LTS( "%255s" ), lPath );
-                LeddarConfigureRecording( lPath, 0, 0 );
-                break;
-            case '2':
-                printf( "\nEnter max file size in MB: " );
-                scanf( "%d", &lChoice );
-                LeddarConfigureRecording( NULL, lChoice, 0 );
-                break;
-            case '3':
-            case  27:
-                return;
-        }
-    }
+		switch (lChoice)
+		{
+		case '1':
+			printf("\nEnter recording directory: ");
+			LeddarScanf(LTS("%255s"), lPath);
+			LeddarConfigureRecording(lPath, 0, 0);
+			break;
+		case '2':
+			printf("\nEnter max file size in MB: ");
+			scanf("%d", &lChoice);
+			LeddarConfigureRecording(NULL, lChoice, 0);
+			break;
+		case '3':
+		case  27:
+			return;
+		}
+	}
 }
 
 // *****************************************************************************
@@ -794,23 +810,23 @@ ConfigureRecordingMenu( void )
 // *****************************************************************************
 
 static void
-ListSensors( void )
+ListSensors(void)
 {
-    char         lAddresses[256];
-    unsigned int lCount = sizeof(lAddresses);
-    unsigned int lIndex = 0;
+	char         lAddresses[256];
+	unsigned int lCount = sizeof(lAddresses);
+	unsigned int lIndex = 0;
 
-    puts( "\nScanning for available sensors, please wait..." );
+	puts("\nScanning for available sensors, please wait...");
 
-    CheckError( LeddarListSensors( lAddresses, &lCount, 2000 ) );
+	CheckError(LeddarListSensors(lAddresses, &lCount, 2000));
 
-    printf( "Found %d sensors\n", lCount );
+	printf("Found %d sensors\n", lCount);
 
-    while( strlen( lAddresses+lIndex ) > 0 )
-    {
-        printf( "%s\n", lAddresses + lIndex );
-        lIndex += strlen( lAddresses+lIndex ) + 1;
-    }
+	while (strlen(lAddresses + lIndex) > 0)
+	{
+		printf("%s\n", lAddresses + lIndex);
+		lIndex += strlen(lAddresses + lIndex) + 1;
+	}
 }
 
 // *****************************************************************************
@@ -820,46 +836,46 @@ ListSensors( void )
 // *****************************************************************************
 
 static void
-MainMenu( void )
+MainMenu(void)
 {
-    for(;;)
-    {
-        int lChoice;
+	for (;;)
+	{
+		int lChoice;
 
-        puts( "\n\nMain Menu" );
-        puts( "  1. Connect" );
-        puts( "  2. Connect to single USB sensor" );
-        puts( "  3. List Sensors" );
-        puts( "  4. Replay Record" );
-        puts( "  5. Configure Recording" );
-        puts( "  6. Quit" );
+		puts("\n\nMain Menu");
+		puts("  1. Connect");
+		puts("  2. Connect to single USB sensor");
+		puts("  3. List Sensors");
+		puts("  4. Replay Record");
+		puts("  5. Configure Recording");
+		puts("  6. Quit");
 
-        lChoice = toupper( LeddarGetKey() );
+		lChoice = toupper(LeddarGetKey());
 
-        switch( lChoice )
-        {
-            case '1':
-                ConnectMenu( 0 );
-                break;
-            case '2':
-                ConnectMenu( 1 );
-                break;
-            case '3':
-                ListSensors();
-                break;
-            case '4':
-                ReplayMenu();
-                break;
-            case '5':
-                ConfigureRecordingMenu();
-                break;
-            case '6':
-            case 'Q':
-            case  27:
-                puts( "\n*** Goodbye! ***" );
-                return;
-        }
-    }
+		switch (lChoice)
+		{
+		case '1':
+			ConnectMenu(0);
+			break;
+		case '2':
+			ConnectMenu(1);
+			break;
+		case '3':
+			ListSensors();
+			break;
+		case '4':
+			ReplayMenu();
+			break;
+		case '5':
+			ConfigureRecordingMenu();
+			break;
+		case '6':
+		case 'Q':
+		case  27:
+			puts("\n*** Goodbye! ***");
+			return;
+		}
+	}
 }
 
 // *****************************************************************************
@@ -869,19 +885,19 @@ MainMenu( void )
 // *****************************************************************************
 
 int
-main( int argc, char *argv[] )
+main(int argc, char *argv[])
 {
-    puts( "*************************************************" );
-    puts( "* Welcome to the LeddarC Demonstration Program! *" );
-    puts( "*************************************************" );
+	puts("*************************************************");
+	puts("* Welcome to the LeddarC Demonstration Program! *");
+	puts("*************************************************");
 
-    gHandle = LeddarCreate();
+	gHandle = LeddarCreate();
 
-    MainMenu();
+	MainMenu();
 
-    LeddarDestroy( gHandle );
+	LeddarDestroy(gHandle);
 
-    return 0;
+	return 0;
 }
 
 // End of file Main.c
