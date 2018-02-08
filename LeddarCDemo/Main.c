@@ -199,22 +199,6 @@ DataCallbackLive(void *aHandle, unsigned int aLevels)
 	return 1;
 }
 
-//Calibration every FrenquencyCalibration times. This function should be called in the fonction Tracking
-static void distanceCalibration(float distance[16], int numInCamera, float average[16], float sigma[16])
-{
-
-	float total[16];
-	float allDistance[16][100];
-	int i = 0; int j = 0;
-
-}
-
-
-
-
-
-
-
 
 //calculation of the speed for the mode replay
 static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTrackinglist)
@@ -226,6 +210,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	float allDistance[16][100];
 	float total[16];
 	float sigma[16];
+	float average[16];
 	for (i = 0; i < 16; i++)
 	{
 		total[i] = 0;
@@ -233,7 +218,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	LdDetection thisDetection[50];
 	LdDetection lastDetection[50];
 	int objet[16];
-	float average[16];
+	
 
 	float lengthView = 5.1;//length of the sensor's view range, calculated by the process calibration
 
@@ -251,6 +236,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 		//printf("Enter the default variance for segment %d", i);
 		//scanf("%f", &sigma[i]);
 		sigma[i] = 0.05;
+		average[i]=11.6;
 	}
 
 
@@ -300,23 +286,23 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 		{
 			for (j = 0; j<16; j++)
 			{
-				average[j] = total[j] / 100;
+				average[j] = total[j] / 100;//the average is updated
 				total[j] = 0;
 				sigma[j] = 0;
 				for (i = 0; i<100; i++)
 				{
 					sigma[j] += ((average[j] - allDistance[j][i])*(average[j] - allDistance[j][i]));
 				}
-				sigma[j] = sigma[j] / 100;
+				sigma[j] = sigma[j] / 100;//the variance is updated
 
 			}		printf("average is %5.2f, sigma is %5.2f  \n", average[5], sigma[5]);
 			numFrameCalibration = 0;
 
-		}
+		}//finish calibration
 		
 		
 		//if a new objet enters in the camera, register it in the trackinglist
-		if ((lastDetection[15].mDistance >=11.0) && (thisDetection[15].mDistance < 11.0))
+		if ((lastDetection[15].mDistance >=([average[15]-5*sigma[15])) && (thisDetection[15].mDistance < ([average[15]-5*sigma[15])))
 		{
 		aTrackinglist[*aSizeTrackinglist].id = *aSizeTrackinglist;//give this object an unique ID
 		aTrackinglist[*aSizeTrackinglist].position = 16;
@@ -329,7 +315,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 		}
 
 		//if an object is leaving
-		if ((lastDetection[0].mDistance >= 11.0) && (thisDetection[0].mDistance < 11.0))
+		if ((lastDetection[0].mDistance >= ([average[0]-5*sigma[0])) && (thisDetection[0].mDistance < ([average[0]-5*sigma[0])))
 		{
 
 		aTrackinglist[*aSizeTrackinglist- numbInCamera].position = 0;
@@ -342,7 +328,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 		}
 		//Calculate the length of the newest entered object: note down the moment when its rear leaves the last segment
 		//length=(rearleavetime-headarrivetime)*speed
-		if ((lastDetection[15].mDistance <= 11.0) && (thisDetection[15].mDistance > 11.0))
+		if ((lastDetection[15].mDistance <= ([average[15]-5*sigma[15])) && (thisDetection[15].mDistance > ([average[15]-5*sigma[15])))
 		{
 
 		if (numbInCamera == 0)//if this is a long object whose head has already left the camera view, its average speed has been calculated
@@ -357,7 +343,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 		{
 		for (i = (*aSizeTrackinglist - 1); i >= (*aSizeTrackinglist - numbInCamera) ;i--)
 		{
-		if (thisDetection[aTrackinglist[i].position - 2].mDistance < 11.0 )
+		if (thisDetection[aTrackinglist[i].position - 2].mDistance < ([average[aTrackinglist[i].position - 2]-5*sigma[aTrackinglist[i].position - 2]) )
 		{
 		aTrackinglist[i].position = aTrackinglist[i].position - 1;
 		}
