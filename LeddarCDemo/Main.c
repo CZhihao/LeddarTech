@@ -33,7 +33,17 @@
 #include "LeddarProperties.h"
 
 #define ARRAY_LEN( a )  (sizeof(a)/sizeof(a[0]))
+
+//*********************************************************************
+//Please change the following default value if necessary 
+
+//The frenquency of sampling
 #define Frenquency 200
+
+//The number of first segment where the objet enters in. 
+//16 if the objet enter from the right side and leave at the letf side. 1 for the oppsite
+#define DirectionIn 16 
+//**********************************************************************
 
 // Global variable to avoid passing to each function.
 static LeddarHandle gHandle = NULL;
@@ -203,10 +213,10 @@ DataCallbackLive(void *aHandle, unsigned int aLevels)
 //calculation of the speed for the mode replay
 static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTrackinglist)
 {
-	int frame = 0;
-	int i,j;
+	int frame =0;
+	int i, j;
 	int numbInCamera = 0;//number of the objets in the camera
-	int numFrameCalibration=0;//number of frames taken for the present calibration
+	int numFrameCalibration = 0;//number of frames taken for the present calibration
 	float allDistance[16][100];
 	float total[16];
 	float sigma[16];
@@ -218,11 +228,11 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	LdDetection thisDetection[50];
 	LdDetection lastDetection[50];
 	int objet[16];
-	
 
-	float lengthView = 5.1;//length of the sensor's view range, calculated by the process calibration
 
-						   //initialize the first frame
+	float lengthView;//length of the sensor's view range, calculated by the step "Calibration"
+
+	//initialize the first frame
 	LeddarMoveRecordTo(aHandle, frame);
 	frame = frame + 1;
 	for (i = 0; i < 16; i++)
@@ -235,15 +245,15 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 	{
 		//printf("Enter the default variance for segment %d", i);
 		//scanf("%f", &sigma[i]);
-		sigma[i] = 0.05;
-		average[i]=11.6;
+		sigma[i] = 0.01;
+		average[i] = 11.0;
 	}
-
+	lengthView = average[7] * 0.2309 * 2;
 
 
 
 	//use this loop "while" to simulate the continual reload
-	while (frame < LeddarGetRecordSize(aHandle))
+	while (frame <3100)// LeddarGetRecordSize(aHandle))
 	{
 		//initialize the first frame
 		LeddarMoveRecordTo(aHandle, frame);
@@ -265,6 +275,7 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 				thisDetection[i].mDistance = lDetections[2 * i + 1].mDistance;
 			}
 		}
+		printf("average is %5.2f, sigma is %5.2f  \n", average[5], sigma[5]);
 
 		//Calibration: get the variance and the average of the road to determinate the confidence interval
 		//Calibration should be made periodically
@@ -295,63 +306,86 @@ static void SpeedRepaly(void *aHandle, Trackinglist *aTrackinglist, int *aSizeTr
 				}
 				sigma[j] = sigma[j] / 100;//the variance is updated
 
-			}		printf("average is %5.2f, sigma is %5.2f  \n", average[5], sigma[5]);
+			}		printf("Calibration updated. average is %5.2f, sigma is %5.2f  \n", average[5], sigma[5]);
 			numFrameCalibration = 0;
+			lengthView = average[7] * 0.2309 * 2;
 
 		}//finish calibration
-		
-		
-		//if a new objet enters in the camera, register it in the trackinglist
-		if ((lastDetection[15].mDistance >=([average[15]-5*sigma[15])) && (thisDetection[15].mDistance < ([average[15]-5*sigma[15])))
-		{
-		aTrackinglist[*aSizeTrackinglist].id = *aSizeTrackinglist;//give this object an unique ID
-		aTrackinglist[*aSizeTrackinglist].position = 16;
-		aTrackinglist[*aSizeTrackinglist].inCamera = 1;
-		aTrackinglist[*aSizeTrackinglist].timeIn =(float) frame;
 
-		*aSizeTrackinglist=*aSizeTrackinglist+1;
-		numbInCamera=numbInCamera+1;
-		printf("An object is entering at the time %d\n",frame);
+
+		 //if a new objet enters in the camera, register it in the trackinglist
+		if ((lastDetection[DirectionIn-1].mDistance >= (average[DirectionIn - 1] - 10 * sigma[15]-0.7)) && (thisDetection[DirectionIn - 1].mDistance < (average[DirectionIn - 1] - 10 * sigma[DirectionIn - 1]-0.7)))
+		{
+			aTrackinglist[*aSizeTrackinglist].id = *aSizeTrackinglist;//give this object an unique ID
+			aTrackinglist[*aSizeTrackinglist].position = DirectionIn - 1;
+			aTrackinglist[*aSizeTrackinglist].inCamera = 1;
+			aTrackinglist[*aSizeTrackinglist].timeIn = (float)frame;
+
+			*aSizeTrackinglist = *aSizeTrackinglist + 1;
+			numbInCamera = numbInCamera + 1;
+			printf("An object is entering at the time %d\n", frame);
 		}
 
 		//if an object is leaving
-		if ((lastDetection[0].mDistance >= ([average[0]-5*sigma[0])) && (thisDetection[0].mDistance < ([average[0]-5*sigma[0])))
+		if ((lastDetection[16- DirectionIn].mDistance >= (average[16 - DirectionIn] - 10 * sigma[16 - DirectionIn]-0.7)) && (thisDetection[16 - DirectionIn].mDistance < (average[16 - DirectionIn] - 10 * sigma[16 - DirectionIn]-0.7)))
 		{
 
-		aTrackinglist[*aSizeTrackinglist- numbInCamera].position = 0;
-		aTrackinglist[*aSizeTrackinglist - numbInCamera].inCamera = 0;//not more in the camera
-		aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut =(float)frame;//note down the leave time(frame)
-		//calculate its average speed: speed=lengthOfView/(timeOut-timeIn)
-		aTrackinglist[*aSizeTrackinglist - numbInCamera].speedAverage= (lengthView/(aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut- aTrackinglist[*aSizeTrackinglist - numbInCamera].timeIn)*(Frenquency));
-		numbInCamera--;
-		printf("An object is leaving at the time %d\n",frame);
+			aTrackinglist[*aSizeTrackinglist - numbInCamera].position = 0;
+			aTrackinglist[*aSizeTrackinglist - numbInCamera].inCamera = 0;//not more in the camera
+			aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut = (float)frame;//note down the leave time(frame)
+																					//calculate its average speed: speed=lengthOfView/(timeOut-timeIn)
+			aTrackinglist[*aSizeTrackinglist - numbInCamera].speedAverage = (lengthView / (aTrackinglist[*aSizeTrackinglist - numbInCamera].timeOut - aTrackinglist[*aSizeTrackinglist - numbInCamera].timeIn)*(Frenquency));
+			numbInCamera--;
+			printf("An object is leaving at the time %d\n", frame);
 		}
+
+
 		//Calculate the length of the newest entered object: note down the moment when its rear leaves the last segment
 		//length=(rearleavetime-headarrivetime)*speed
-		if ((lastDetection[15].mDistance <= ([average[15]-5*sigma[15])) && (thisDetection[15].mDistance > ([average[15]-5*sigma[15])))
+		if ((lastDetection[DirectionIn - 1].mDistance <= (average[DirectionIn - 1] - 10 * sigma[DirectionIn - 1]-0.7)) && (thisDetection[DirectionIn - 1].mDistance > (average[DirectionIn - 1] - 10 * sigma[DirectionIn - 1]-0.7)))
 		{
 
-		if (numbInCamera == 0)//if this is a long object whose head has already left the camera view, its average speed has been calculated
-		aTrackinglist[*aSizeTrackinglist - 1].length = aTrackinglist[*aSizeTrackinglist - 1].speedAverage*((frame - aTrackinglist[*aSizeTrackinglist - 1].timeIn) / Frenquency);
-		else
-		{
-		aTrackinglist[*aSizeTrackinglist - numbInCamera].length = (16 - aTrackinglist[*aSizeTrackinglist - numbInCamera].position)*lengthView / 16;
-		}
+			if (numbInCamera == 0)//if this is a long object whose head has already left the camera view, its average speed has been calculated
+				aTrackinglist[*aSizeTrackinglist - 1].length = aTrackinglist[*aSizeTrackinglist - 1].speedAverage*((frame - aTrackinglist[*aSizeTrackinglist - 1].timeIn) / Frenquency);
+			else
+			{
+				aTrackinglist[*aSizeTrackinglist - 1].length = abs((DirectionIn - (aTrackinglist[*aSizeTrackinglist - 1].position+1)))*lengthView / 16;
+			}
 		}
 		//update the tracking object's position
-		if(numbInCamera > 0)
+		if (numbInCamera > 0)
 		{
-		for (i = (*aSizeTrackinglist - 1); i >= (*aSizeTrackinglist - numbInCamera) ;i--)
-		{
-		if (thisDetection[aTrackinglist[i].position - 2].mDistance < ([average[aTrackinglist[i].position - 2]-5*sigma[aTrackinglist[i].position - 2]) )
-		{
-		aTrackinglist[i].position = aTrackinglist[i].position - 1;
+			for (i = (*aSizeTrackinglist - 1); i >= (*aSizeTrackinglist - numbInCamera); i--)
+			{
+				if (DirectionIn == 16)
+				{
+					if (thisDetection[aTrackinglist[i].position - 2].mDistance < (average[aTrackinglist[i].position - 2] - 10 * sigma[aTrackinglist[i].position - 2] - 0.7))
+					{
+						aTrackinglist[i].position = aTrackinglist[i].position - 1;
+					}
+				}
+				else
+				{
+					if (thisDetection[aTrackinglist[i].position ].mDistance < (average[aTrackinglist[i].position ] - 10 * sigma[aTrackinglist[i].position ] - 0.7))
+					{
+						aTrackinglist[i].position = aTrackinglist[i].position + 1;
+					}
+				}
+
+			}
 		}
 
+		//Display the tracking list
+		printf("%d object(s) currently detected\n", numbInCamera);
+		if(SizeTrackinglist>0)
+		printf("ID   Position   Time In     Time Out    Average Speed    Object Size\n");
+		for (i = 0; i < SizeTrackinglist; i++)
+		{
+
+			printf("%d,    %d,     %7.2f,      %7.2f,     %7.2fm/s,    %7.2fm\n", i+1, aTrackinglist[i].position, aTrackinglist[i].timeIn, aTrackinglist[i].timeOut, aTrackinglist[i].speedAverage, aTrackinglist[i].length);
 		}
-		}
-		printf("%d, %d,,%f,%f %f,%f\n", aTrackinglist[0].id, aTrackinglist[0].position, aTrackinglist[0].timeIn, aTrackinglist[0].timeOut, aTrackinglist[0].speedAverage, aTrackinglist[0].length);
 		
+		printf("\n");
 
 		//LeddarSleep(0.002);
 
@@ -444,7 +478,7 @@ ReadLiveData(void)
 static void
 ReplayData(void)
 {
-	puts("\nP to go forward, O to go backward, H to return to beginning, Q to quit£¬ M to mean value");
+	puts("\nP to go forward, O to go backward, H to return to beginning, Q to quit, M to mean value, T to display Trackinglist");
 
 	CheckError(LeddarStartDataTransfer(gHandle, LDDL_DETECTIONS));
 	CheckError(LeddarAddCallback(gHandle, DataCallback, gHandle));
